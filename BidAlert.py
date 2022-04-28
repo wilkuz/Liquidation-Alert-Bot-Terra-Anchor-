@@ -41,52 +41,50 @@ def getBidsByUser(address):
 if __name__ == "__main__":
     while True:
         bid_ids = getBidsByUser(bot_address)
+        bLunaBought = 0
         for bid in bid_ids:
                 info = getBidInfo(bid)
                 if not info["pending_liquidated_collateral"] == "0":
-                  #simulate swap
-                  ## SIMULATE SWAP ON ASTROPORT ##
-                  astroMsg = {
-                    "simulate_swap_operations": {
-                      "offer_amount": "100",
-                      "operations": [
-                       {
-                          "astro_swap": {
-                            "offer_asset_info": {
-                              "token": {
-                                  "contract_addr": BLUNA_CONTRACT
-                                }
-                            },
-                            "ask_asset_info": {
-                              "native_token": {
-                                  "denom": "uluna"
-                                }
+                  bLunaBought += int(info["pending_liquidated_collateral"])
+        if bLunaBought > 0:
+          astroMsg = {
+                      "simulate_swap_operations": {
+                        "offer_amount": "100",
+                        "operations": [
+                         {
+                            "astro_swap": {
+                              "offer_asset_info": {
+                                "token": {
+                                    "contract_addr": BLUNA_CONTRACT
+                                  }
+                              },
+                              "ask_asset_info": {
+                                "native_token": {
+                                    "denom": "uluna"
+                                  }
+                              }
+                            }
+                          },
+                          {
+                            "native_swap": {
+                              "offer_denom": "uluna",
+                              "ask_denom": "uusd"
                             }
                           }
-                        },
-                        {
-                          "native_swap": {
-                            "offer_denom": "uluna",
-                            "ask_denom": "uusd"
-                          }
-                        }
-                      ]
-                    }
-                  }
-                  
-                  simulation = terra.wasm.contract_query(ASTROPORT_ROUTER, astroMsg)                  
-                  price = int(simulation["amount"]) / 100
-                  #notify that bid is filled
-                  notificationString = f"Bid {info['idx']} filled for {int(info['pending_liquidated_collateral']) / 1000000} bLuna, current bLuna price is ${price}"
-                  header = {"Content-type": "application/json"}
-                  body = {
-                      "title": "Liquidation bid filled!",
-                      "body": notificationString
+                        ]
                       }
-                  print("notified")
-                  requests.post(f"{pushURL}/api/v1/notify/c4ff2d22-b35a-46ef-a831-9d4766c37989", headers=header, json=body)
-                else:
-                  print("No bids filled")
-
-    sleep(1)
-    
+                    }
+          simulation = terra.wasm.contract_query(ASTROPORT_ROUTER, astroMsg)                  
+          price = int(simulation["amount"]) / 100
+          #notify that bid is filled
+          notificationString = f"Bid {info['idx']} filled, bought {bLunaBought}) / 1000000} bLuna, current bLuna price is ${price}"
+          header = {"Content-type": "application/json"}
+          body = {
+              "title": "Liquidation bid filled!",
+              "body": notificationString
+              }
+          print("notified")
+          requests.post(f"{pushURL}/api/v1/notify/c4ff2d22-b35a-46ef-a831-9d4766c37989", headers=header, json=body)
+        else:
+          print("No bids filled")
+        sleep(1)
