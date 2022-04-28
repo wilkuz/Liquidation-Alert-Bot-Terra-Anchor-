@@ -14,6 +14,8 @@ bot_address = os.environ.get("bot_address")
 
 ANC_LIQ_QUE_CONTRACT = "terra1e25zllgag7j9xsun3me4stnye2pcg66234je3u"
 BLUNA_CONTRACT = "terra1kc87mu460fwkqte29rquh4hc20m54fxwtsx7gp"
+ASTROPORT_ROUTER = "terra16t7dpwwgx9n3lq6l6te3753lsjqwhxwpday9zx"
+
 
 terra = LCDClient(networkRPC, network)
 
@@ -42,15 +44,49 @@ if __name__ == "__main__":
         for bid in bid_ids:
                 info = getBidInfo(bid)
                 if not info["pending_liquidated_collateral"] == "0":
-                    #notify that bid is filled
-                    notificationString = f"Bid {info['idx']} filled for {int(info['pending_liquidated_collateral']) * 1000000} bLuna"
-                    header = {"Content-type": "application/json"}
-                    body = {
-                        "title": "Liquidation bid filled!",
-                        "body": notificationString
+                  #simulate swap
+                  ## SIMULATE SWAP ON ASTROPORT ##
+                  astroMsg = {
+                    "simulate_swap_operations": {
+                      "offer_amount": "100",
+                      "operations": [
+                       {
+                          "astro_swap": {
+                            "offer_asset_info": {
+                              "token": {
+                                  "contract_addr": BLUNA_CONTRACT
+                                }
+                            },
+                            "ask_asset_info": {
+                              "native_token": {
+                                  "denom": "uluna"
+                                }
+                            }
+                          }
+                        },
+                        {
+                          "native_swap": {
+                            "offer_denom": "uluna",
+                            "ask_denom": "uusd"
+                          }
                         }
-                    print("notified")
-                    requests.post(f"{pushURL}/api/v1/notify/{pushAPIKey}", headers=header, json=body)
+                      ]
+                    }
+                  }
+                  
+                  simulation = terra.wasm.contract_query(ASTROPORT_ROUTER, astroMsg)                  
+                  price = int(simulation["amount"]) / 100
+                  #notify that bid is filled
+                  notificationString = f"Bid {info['idx']} filled for {int(info['pending_liquidated_collateral']) / 1000000} bLuna, current bLuna price is ${price}"
+                  header = {"Content-type": "application/json"}
+                  body = {
+                      "title": "Liquidation bid filled!",
+                      "body": notificationString
+                      }
+                  print("notified")
+                  requests.post(f"{pushURL}/api/v1/notify/c4ff2d22-b35a-46ef-a831-9d4766c37989", headers=header, json=body)
+                else:
+                  print("No bids filled")
 
-        sleep(1)
+    sleep(1)
     
